@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Its My Sample Page</title>
+    <script src="Scripts/jquery-3.6.0.js"></script>
+</head>
+<body>
+    <select style="display:none" id="availableLanguages"></select><br />
+    Now the SharePoint part. We will write JavaScript code to read the SharePoint page content and page title. 
+    The REST calls will be made to google api to get the data. Here is the documentation 
+    https://cloud.google.com/translate/v2/using_rest
+    A drop down list on the page will show all the available languages for the translation. 
+    Selecting a language in the drop down list will send the page content and title to translation API and get back the translated text. Finally, the page will be updated with translated text.
+    A SharePoint page layout should be created in order to make this reusable across all pages created from that layout 
+    instead of using the code in each page. In this post we will focus on the actual code for translation.
+    First we will read the page content and page title using JavaScript Client Object model JQuery 
+
+</body>
+</html>
+
+<script language="javascript">
+    var NY = window.NY || {};
+    NY.LocalLanguageTranslation = function () {
+
+        // Google translation service key for browser applications
+        var appKey = 'AIzaSyB57NFWzGBFDzAgmgBRW-P3TyPrku284Ow';
+        var pageTitle;
+        var pageContent;
+        var languageDropdownList = $("#availableLanguages");
+        var initialize = function () {
+            retrievePageFieldValues().then(
+                function (page) {
+                    pageTitle = page.get_item('Title');
+                    pageContent = page.get_item('PublishingPageContent');
+                    buildLanguageDropdownList();
+                },
+                function (sender, args) {
+                    console.log('An error occurred while retrieving list item:' + args.get_message());
+                }
+            );
+        };
+
+        var retrievePageFieldValues = function () {
+            var deferred = jQuery.Deferred();
+            var context = new SP.ClientContext.get_current();
+            var listId = _spPageContextInfo.pageListId;
+            var itemId = _spPageContextInfo.pageItemId;
+            var pagesList = context.get_web().get_lists().getById(listId);
+            var page = pagesList.getItemById(itemId);
+            context.load(page);
+            context.executeQueryAsync(Function.createDelegate(this, function () { deferred.resolve(page); }),
+                Function.createDelegate(this, function (sender, args) { deferred.reject(sender, args); }));
+            return deferred.promise();
+        };
+
+        var buildLanguageDropdownList = function () {
+            jQuery.ajax({
+                dataType: 'jsonp',
+                url: "https://www.googleapis.com/language/translate/v2/languages",
+                data: { key: appKey, target: 'en' }
+            })
+                .done(function (response) {
+                    if (!response.error) {
+                        languageDropdownList.show();
+                        languageDropdownList.append('<option>Translate Section</option>');
+                        var languages = response.data.languages;
+                        $.each(languages, function (index, language) {
+                            languageDropdownList.append('<option value="' + language.language + '">' + language.name + '</option>');
+                        })
+                    }
+                    else {
+                        console.log(response.error);
+                    }
+                })
+                .fail(function (qXHR, textStatus, errorThrown) {
+                    console.log(errorThrown);
+                });
+        };
+
+        var performTranslation = function (targetLanguage, pageContent, pageTitle) {
+            jQuery.ajax({
+                type: "POST",
+                headers: { "X-HTTP-Method-Override": "GET" },
+                traditional: true,
+                url: "https://www.googleapis.com/language/translate/v2",
+                dataType: "jsonp",
+                data: { key: appKey, target: targetLanguage, q: [pageContent, pageTitle] }
+            })
+                .done(function (response) {
+                    if (!response.error) {
+                        jQuery('.contentDiv').html(response.data.translations[0].translatedText);
+                        jQuery('.titleDiv').text(response.data.translations[1].translatedText);
+                    }
+                    else {
+                        console.log(response.error);
+                    }
+                })
+                .fail(function (qXHR, textStatus, errorThrown) {
+                    console.log(errorThrown);
+                });
+        };
+
+        languageDropdownList.change(function () {
+            var targetLanguage = this.value;
+            if (pageContent && pageTitle) {
+                performTranslation(targetLanguage, pageContent, pageTitle);
+            }
+            else {
+                retrievePageFieldValues().then(
+                    function (page) {
+                        pageTitle = page.get_item('Title');
+                        pageContent = page.get_item('PublishingPageContent');
+                        performTranslation(targetLanguage, pageContent, pageTitle);
+                    },
+                    function (sender, args) {
+                        console.log('An error occured while retrieving list item:' + args.get_message());
+                    }
+                );
+            }
+        });
+
+        //public interface
+        return {
+            initialize: initialize
+        };
+    }();
+    $(document).ready(function () {
+        NY.LocalLanguageTranslation.initialize;
+    });
+
+    //_spBodyOnLoadFunctionNames.push("NY.LocalLanguageTranslation.initialize");
+</script>
+
+
+

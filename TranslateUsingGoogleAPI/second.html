@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Its My Second Sample Page</title>
+    <script src="Scripts/jquery-3.6.0.js"></script>
+</head>
+<body>
+    <select style="display:none" id="availableLanguages"></select>
+    <div class="contentDiv">
+        Now the SharePoint part. We will write JavaScript code to read the SharePoint page content and page title. The REST calls will be made to google api to get the data. Here is the documentation https://cloud.google.com/translate/v2/using_rest
+        A drop down list on the page will show all the available languages for the translation. Selecting a language in the drop down list will send the page content and title to translation API and get back the translated text. Finally, the page will be updated with translated text.
+        A SharePoint page layout should be created in order to make this reusable across all pages created from that layout instead of using the code in each page. In this post we will focus on the actual code for translation.
+        First we will read the page content and page title using JavaScript Client Object model JQuery Deferreds:
+    </div>
+    <div class="anotherDiv">
+        I disagree that the div element would always serve no purpose. If you have reusable OOCSS-type styles, or if the text could expand to more than one paragraph in the future (and those paragraphs need to function as a block together), then wrapping it in a div could be perfectly reasonable. You don't know the purpose of the html, so how can you legitimately dictate the structure! Consider the case of the nested div and p--if you combine them and their styling into a single p, then you have to split it back out when the content changes to two paragraphs. That shows fragility. –
+        ErikE
+        Feb 5 '15 at 21:45
+        It would be great to have an explicit discussion of the accessibility implications here, if any. –
+        Andy
+        May 27
+    </div>
+
+    <div class="div3">
+        A drop down list on the page will show all the available languages for the translation. Selecting a language in the drop down list will send the page content and title to translation API and get back the translated text. Finally, the page will be updated with translated text.
+        <p>A SharePoint page layout should be</p>
+        <b>Feb 5 '15 at 21:45</b>
+        It would be great to have an explicit discussion of the accessibility implications here, if any. –
+        Andy
+        May 27
+    </div>
+
+</body>
+
+</html>
+<script language="javascript">
+    var appKey = 'AIzaSyB57NFWzGBFDzAgmgBRW-P3TyPrku284Ow';
+    var pageTitle;
+    var pageContent;
+    var languageDropdownList = $("#availableLanguages");
+
+    $(document).ready(function () {
+        buildLanguageDropdownList();
+        pageTitle = $('Title');
+        //pageContent = $('.contentDiv').html();
+        //pageContent = $('.contentDiv').html();
+        pageContent = jQuery('.contentDiv').html();
+        //document.getElementsByTagName('html')[0].innerHTML;
+
+    });
+
+    var buildLanguageDropdownList = function () {
+        jQuery.ajax({
+            dataType: 'jsonp',
+            url: "https://www.googleapis.com/language/translate/v2/languages",
+            data: { key: appKey, target: 'en' }
+        })
+            .done(function (response) {
+                if (!response.error) {
+                    languageDropdownList.show();
+                    languageDropdownList.append('<option>Translate Section</option>');
+                    var languages = response.data.languages;
+                    $.each(languages, function (index, language) {
+                        languageDropdownList.append('<option value="' + language.language + '">' + language.name + '</option>');
+                    })
+                }
+                else {
+                    console.log(response.error);
+                }
+            })
+            .fail(function (qXHR, textStatus, errorThrown) {
+                console.log(errorThrown);
+            });
+    };
+
+    var performTranslation = function (elm, targetLanguage, pageContent) {
+        jQuery.ajax({
+            type: "POST",
+            headers: { "X-HTTP-Method-Override": "GET" },
+            traditional: true,
+            url: "https://www.googleapis.com/language/translate/v2",
+            dataType: "jsonp",
+            data: { key: appKey, target: targetLanguage, q: [pageContent] }
+        })
+            .done(function (response) {
+                if (!response.error) {
+                    //jQuery('.contentDiv').html(response.data.translations[0].translatedText);
+                    //jQuery('.anotherDiv').html(response.data.translations[0].translatedText);
+                    //alert(response.data.translations[0].translatedText);
+                    //return response.data.translations[0].translatedText;
+                    //alert(elm);
+                    $(elm).text(response.data.translations[0].translatedText);
+                    //elm.text();
+                }
+                else {
+                    console.log(response.error);
+                }
+            })
+            .fail(function (qXHR, textStatus, errorThrown) {
+                console.log(errorThrown);
+            });
+    };
+
+    languageDropdownList.change(function () {
+        var targetLanguage = this.value;
+        var divs = $('div');
+        var i = 0;
+        divs.each((i, instance) => {
+            
+            var newtext = performTranslation(instance, targetLanguage, $(instance).text());
+            //alert('transalate text:' + newtext);
+            //$(instance).text(++i);
+            //alert(targetLanguage + ': targetlang;  after applying: ' + $(instance).text());
+            // Wrap instance DOM object into a jQuery object before calling .text
+        });
+        //if (pageContent && pageTitle) {
+        //    performTranslation(targetLanguage, pageContent);
+        //}
+
+
+        //else {
+        //    retrievePageFieldValues().then(
+        //        function (page) {
+        //            pageTitle = page.get_item('Title');
+        //            pageContent = page.get_item('PublishingPageContent');
+        //            performTranslation(targetLanguage, pageContent, pageTitle);
+        //        },
+        //        function (sender, args) {
+        //            console.log('An error occured while retrieving list item:' + args.get_message());
+        //        }
+        //    );
+        //}
+    });
+
+</script>
